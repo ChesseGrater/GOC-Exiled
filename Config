@@ -1,0 +1,63 @@
+using Exiled.API.Enums;
+using Exiled.API.Interfaces;
+using System.Collections.Generic;
+
+#nullable disable
+namespace GOK
+{
+  public class Config : IConfig
+  {
+    public bool IsEnabled { get; set; } = true;
+
+    public int GocMaxSquad { get; set; } = 30;
+
+    public int GocMinSquad { get; set; } = 1;
+
+    public List<ItemType> GocInventory { get; set; } = new List<ItemType>()
+    {
+      (ItemType) 21,
+      (ItemType) 10,
+      (ItemType) 14,
+      (ItemType) 33,
+      (ItemType) 12,
+      (ItemType) 41,
+      (ItemType) 37
+    };
+
+    public Dictionary<AmmoType, ushort> GocAmmo { get; set; } = new Dictionary<AmmoType, ushort>()
+    {
+      {
+        (AmmoType) 1,
+        (ushort) 100
+      },
+      {
+        (AmmoType) 2,
+        (ushort) 100
+      },
+      {
+        (AmmoType) 3,
+        (ushort) 400
+      },
+      {
+        (AmmoType) 5,
+        (ushort) 100
+      },
+      {
+        (AmmoType) 4,
+        (ushort) 100
+      }
+    };
+
+    public float GocHP { get; set; } = 120f;
+
+    public int GocSpawnChance { get; set; } = 25;
+
+    public string GocRoleName { get; set; } = "GOC";
+
+    public string GocCassieMessage { get; set; } = "An Unauthorized group hasentered the facility at Gate A elevator.";
+
+    public string GocSpawnBroadcast { get; set; } = "<size=60>Your the - <color=#03F555><b>GOC</b></color></size>\n<i><color=#FF0000>kill everyone</color>, to win!</i>";
+
+    public bool DebugMode { get; set; } = false;
+  }
+}

@@ -1,0 +1,68 @@
+using CommandSystem;
+using Exiled.API.Features;
+using System;
+
+#nullable disable
+namespace GOK
+{
+  [CommandHandler(typeof (RemoteAdminCommandHandler))]
+  internal class SpawnSh : ParentCommand
+  {
+    public virtual string Command { get; } = "spawnsh";
+
+    public virtual string[] Aliases { get; } = new string[5]
+    {
+      "spawngoc",
+      "spawngok",
+      "gocspawn",
+      "gokspawn",
+      "gspawn"
+    };
+
+    public virtual string Description { get; } = "Spawns GOC";
+
+    public virtual void LoadGeneratedCommands()
+    {
+    }
+
+    protected virtual bool ExecuteParent(
+      ArraySegment<string> arguments,
+      ICommandSender sender,
+      out string response)
+    {
+      if (!Exiled.Permissions.Extensions.Permissions.CheckPermission(sender, "goc.spawn"))
+      {
+        response = "You do not have permission. The required permission: goc.spawn.";
+        return false;
+      }
+      if (arguments.Count == 0)
+      {
+        Player player = Player.Get(sender);
+        if (Plugin.plugin.Gplayers.Contains(player))
+        {
+          response = "Player " + player.Nickname + " already GOC!";
+          return false;
+        }
+        Plugin.plugin.SpawnPlayer(player);
+        Log.Debug("Player " + Player.Get(sender).Nickname + " under ID " + Player.Get(sender).CustomUserId + " spawned himself as a GOC.", Plugin.plugin.Config.DebugMode);
+        response = "Player " + player.Nickname + " became GOC";
+        return true;
+      }
+      Player player1 = Player.Get(CollectionExtensions.At<string>(arguments, 0));
+      if (player1 == null)
+      {
+        response = "This player does not exist. Player ID or nickname required!";
+        return false;
+      }
+      if (Plugin.plugin.Gplayers.Contains(player1))
+      {
+        response = "Player " + player1.Nickname + " already GOC!";
+        return false;
+      }
+      Plugin.plugin.SpawnPlayer(player1);
+      Log.Debug("Player " + Player.Get(sender).Nickname + " under ID " + Player.Get(sender).CustomUserId + " spawned a player " + player1.Nickname + " as GOC.", Plugin.plugin.Config.DebugMode);
+      response = "Player " + player1.Nickname + " became GOC!";
+      return true;
+    }
+  }
+}

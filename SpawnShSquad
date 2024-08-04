@@ -1,0 +1,54 @@
+using CommandSystem;
+using Exiled.API.Features;
+using MEC;
+using Respawning;
+using System;
+
+#nullable disable
+namespace GOK
+{
+  [CommandHandler(typeof (RemoteAdminCommandHandler))]
+  internal class SpawnShSquad : ParentCommand
+  {
+    public virtual string Command { get; } = "spawnshsquad";
+
+    public virtual string[] Aliases { get; } = new string[7]
+    {
+      "spawngocsquad",
+      "spawngoksquad",
+      "gocspawnsquad",
+      "gokspawnsquad",
+      "gspawns",
+      "gss",
+      "ssg"
+    };
+
+    public virtual string Description { get; } = "Spawns GOK squad";
+
+    public virtual void LoadGeneratedCommands()
+    {
+    }
+
+    protected virtual bool ExecuteParent(
+      ArraySegment<string> arguments,
+      ICommandSender sender,
+      out string response)
+    {
+      if (!Exiled.Permissions.Extensions.Permissions.CheckPermission(sender, "goc.spawnsquad"))
+      {
+        response = "You do not have permission. The required permission: goc.spawnsquad.";
+        return false;
+      }
+      if (!FBI.Plugin.plugin.TeamsCanSpawn)
+      {
+        response = "The FBI has completed all its tasks, so teams cannot spawn!";
+        return false;
+      }
+      Plugin.plugin.Known = true;
+      Timing.CallDelayed(0.5f, (Action) (() => Respawn.ForceWave((SpawnableTeamType) 1, false)));
+      Log.Debug("Player " + Player.Get(sender).Nickname + " under ID " + Player.Get(sender).CustomUserId + " spawned a GOC squad.", Plugin.plugin.Config.DebugMode);
+      response = "There's a GOC squad.";
+      return true;
+    }
+  }
+}

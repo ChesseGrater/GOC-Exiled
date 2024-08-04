@@ -1,0 +1,231 @@
+using CustomPlayerEffects;
+using Exiled.API.Enums;
+using Exiled.API.Features;
+using Exiled.API.Features.DamageHandlers;
+using Exiled.API.Features.Items;
+using Exiled.API.Structs;
+using Exiled.Events.EventArgs;
+using Exiled.Events.Handlers;
+using MEC;
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+#nullable disable
+namespace GOK
+{
+  public class Plugin : Plugin<Config>
+  {
+    public static Plugin plugin;
+    public bool Known = false;
+    public List<Player> Gplayers = new List<Player>();
+    private bool going = false;
+    private bool CanSpawn = true;
+    private List<DamageType> damageTypes = new List<DamageType>()
+    {
+      (DamageType) 3,
+      (DamageType) 13,
+      (DamageType) 19,
+      (DamageType) 36,
+      (DamageType) 0,
+      (DamageType) 2,
+      (DamageType) 17,
+      (DamageType) 14,
+      (DamageType) 1,
+      (DamageType) 9,
+      (DamageType) 16
+    };
+
+    public virtual string Prefix => "goc";
+
+    public virtual string Name => "Global Occult Coalition";
+
+    public virtual string Author => "Chesse_grater";
+
+    public virtual Version Version { get; } = new Version(1, 0, 0);
+
+    public virtual void OnEnabled()
+    {
+      Plugin.plugin = this;
+      Server.RespawningTeam += new Exiled.Events.Events.CustomEventHandler<RespawningTeamEventArgs>(this.OnTeamRespawn);
+      Server.RoundStarted += new Exiled.Events.Events.CustomEventHandler(this.OnRoundStart);
+      Server.RestartingRound += new Exiled.Events.Events.CustomEventHandler(this.OnRoundEnd);
+      Player.Hurting += new Exiled.Events.Events.CustomEventHandler<HurtingEventArgs>(this.OnPlayerHurt);
+      Player.UsingRadioBattery += new Exiled.Events.Events.CustomEventHandler<UsingRadioBatteryEventArgs>(this.OnRadioUse);
+      Player.Died += new Exiled.Events.Events.CustomEventHandler<DiedEventArgs>(this.OnPlayerDie);
+      Player.ChangingRole += new Exiled.Events.Events.CustomEventHandler<ChangingRoleEventArgs>(this.OnPlayerForceclass);
+      Player.Left += new Exiled.Events.Events.CustomEventHandler<LeftEventArgs>(this.OnPlayerLeave);
+      Player.Dying += new Exiled.Events.Events.CustomEventHandler<DyingEventArgs>(this.OnPlayerDying);
+      base.OnEnabled();
+    }
+
+    private void OnPlayerDying(DyingEventArgs ev)
+    {
+    }
+
+    private void cleanup()
+    {
+      if (!this.going)
+        return;
+      foreach (Pickup pickup in Map.Pickups)
+      {
+        if (pickup.Type.ToString().ToLower().StartsWith("ammo"))
+          pickup.Destroy();
+      }
+      foreach (Player player in Player.List)
+      {
+        foreach (AmmoType ammoType in new List<AmmoType>()
+        {
+          (AmmoType) 1,
+          (AmmoType) 2,
+          (AmmoType) 3,
+          (AmmoType) 5,
+          (AmmoType) 4
+        })
+        {
+          if (!player.IsCuffed)
+            player.SetAmmo(ammoType, (ushort) 100);
+        }
+      }
+      Timing.CallDelayed(5f, (Action) (() => this.cleanup()));
+    }
+
+    private void gocspawn()
+    {
+      if (!Round.IsStarted)
+        return;
+      foreach (Player player in Player.List)
+      {
+        if (player.CustomInfo == "GOC" && (double) player.Position.z > -48.0 && (double) player.Position.z < -37.0 && (double) player.Position.x > 48.0 && (double) player.Position.x < 59.0 && (double) player.Position.y > 1014.0 && (double) player.Position.y < 1029.0)
+          player.Position = new Vector3(0.0f, 1005f, 8f);
+      }
+      Timing.CallDelayed(3f, (Action) (() => this.gocspawn()));
+    }
+
+    private void OnAmmoDropped(DroppingAmmoEventArgs ev) => ev.IsAllowed = false;
+
+    private void OnRadioUse(UsingRadioBatteryEventArgs ev)
+    {
+      ev.IsAllowed = false;
+      ev.Radio.Range = (RadioRange) 3;
+      ev.Drain = 0.0f;
+    }
+
+    public void SpawnPlayer(Player player)
+    {
+      player.SetRole((RoleType) 14, (SpawnReason) 7, false);
+      player.EnableEffect<Visuals173Blink>(1f, false);
+      this.Gplayers.Add(player);
+      player.ClearInventory(true);
+      Timing.CallDelayed(0.05f, (Action) (() => player.Broadcast((ushort) 15, this.Config.GocSpawnBroadcast, (Broadcast.BroadcastFlags) 0, false)));
+      foreach (ItemType itemType in this.Config.GocInventory)
+      {
+        ItemType item = itemType;
+        Timing.CallDelayed(0.1f, (Action) (() => player.AddItem(item, (IEnumerable<AttachmentIdentifier>) null)));
+      }
+      Timing.CallDelayed(0.9f, (Action) (() => player.Position = new Vector3(0.0f, 1002f, 8f)));
+      Timing.CallDelayed(0.95f, (Action) (() => player.Broadcast((ushort) 5, "", (Broadcast.BroadcastFlags) 0, false)));
+      Timing.CallDelayed(1f, (Action) (() => player.Health = this.Config.GocHP));
+      Timing.CallDelayed(1.025f, (Action) (() => player.MaxHealth = (int) this.Config.GocHP));
+      foreach (KeyValuePair<AmmoType, ushort> keyValuePair in this.Config.GocAmmo)
+      {
+        KeyValuePair<AmmoType, ushort> entry = keyValuePair;
+        Timing.CallDelayed(0.1f, (Action) (() => player.SetAmmo(entry.Key, entry.Value)));
+      }
+      Timing.CallDelayed(1.3f, (Action) (() => player.CustomInfo = "GOC"));
+    }
+
+    private void OnTeamRespawn(RespawningTeamEventArgs ev)
+    {
+      if (!FBI.Plugin.plugin.TeamsCanSpawn)
+        return;
+      if (!this.Known)
+      {
+        int num1 = new Random().Next(1, 101);
+        if (num1 <= this.Config.GocSpawnChance && ev.Players.Count >= this.Config.GocMinSquad)
+        {
+          ev.IsAllowed = false;
+          foreach (Player player in ev.Players)
+          {
+            int num2 = ev.Players.IndexOf(player);
+            player.IsGodModeEnabled = false;
+            this.SpawnPlayer(player);
+            if (num2 >= this.Config.GocMaxSquad)
+              break;
+          }
+          Cassie.Message(this.Config.GocCassieMessage, false, true, false);
+          this.gocspawn();
+        }
+        Log.Debug(string.Format("RND SPAWN NUMBER: {0}% OUT OF {1}%", (object) num1, (object) this.Config.GocSpawnChance), this.Config.DebugMode);
+      }
+      else
+      {
+        ev.IsAllowed = false;
+        foreach (Player player in ev.Players)
+        {
+          int num = ev.Players.IndexOf(player);
+          player.IsGodModeEnabled = false;
+          this.SpawnPlayer(player);
+          if (num >= this.Config.GocMaxSquad)
+            break;
+        }
+        this.gocspawn();
+        Cassie.Message(this.Config.GocCassieMessage, false, true, false);
+        this.Known = false;
+        Log.Debug(string.Format("RND SPAWN NUMBER: 100% OUT OF {0}%", (object) this.Config.GocSpawnChance), this.Config.DebugMode);
+      }
+    }
+
+    private void OnPlayerHurt(HurtingEventArgs ev)
+    {
+      if (!this.Gplayers.Contains(ev.Target) || !ev.Attacker.CustomInfo.ToLower().Contains("SCP-035"))
+        return;
+      ((AttackerDamageHandler) ev.Handler).ForceFullFriendlyFire = true;
+      ev.IsAllowed = true;
+    }
+
+    private void OnRoundEnd()
+    {
+      this.Gplayers.Clear();
+      this.going = false;
+    }
+
+    private void OnRoundStart()
+    {
+      this.Gplayers.Clear();
+      this.going = true;
+      this.cleanup();
+    }
+
+    private void OnPlayerLeave(LeftEventArgs ev)
+    {
+      this.Gplayers.Remove(((JoinedEventArgs) ev).Player);
+    }
+
+    private void OnPlayerForceclass(ChangingRoleEventArgs ev)
+    {
+      this.Gplayers.Remove(ev.Player);
+      ev.Player.CustomInfo = "";
+    }
+
+    private void OnPlayerDie(DiedEventArgs ev)
+    {
+      this.Gplayers.Remove(ev.Target);
+      ev.Target.CustomInfo = "";
+    }
+
+    public virtual void OnDisabled()
+    {
+      Plugin.plugin = (Plugin) null;
+      Server.RespawningTeam -= new Exiled.Events.Events.CustomEventHandler<RespawningTeamEventArgs>(this.OnTeamRespawn);
+      Server.RoundStarted -= new Exiled.Events.Events.CustomEventHandler(this.OnRoundStart);
+      Server.RestartingRound -= new Exiled.Events.Events.CustomEventHandler(this.OnRoundEnd);
+      Player.Hurting -= new Exiled.Events.Events.CustomEventHandler<HurtingEventArgs>(this.OnPlayerHurt);
+      Player.UsingRadioBattery -= new Exiled.Events.Events.CustomEventHandler<UsingRadioBatteryEventArgs>(this.OnRadioUse);
+      Player.Died -= new Exiled.Events.Events.CustomEventHandler<DiedEventArgs>(this.OnPlayerDie);
+      Player.ChangingRole -= new Exiled.Events.Events.CustomEventHandler<ChangingRoleEventArgs>(this.OnPlayerForceclass);
+      Player.Left -= new Exiled.Events.Events.CustomEventHandler<LeftEventArgs>(this.OnPlayerLeave);
+      base.OnDisabled();
+    }
+  }
+}
